@@ -1,0 +1,825 @@
+openapi: 3.0.3
+info:
+  title: 7Sete × VendaExpress Integration API
+  version: 1.0.0
+  description: >
+    Camada de orquestração e normalização para o Seller Portal do 7Sete.
+    Coordena o acesso aos backends PHP (7Sete) e Node.js (VendaExpress)
+    sem expor credenciais nem detalhes internos ao frontend.
+  contact:
+    name: 7Sete Seller Portal Team
+  license:
+    name: Proprietary
+    url: https://7sete.ao
+
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Desenvolvimento local
+  - url: https://api.vendedor.7sete.ao/api/v1
+    description: Produção
+
+tags:
+  - name: auth
+    description: Autenticação e sessão
+  - name: sellers
+    description: Identidade do vendedor
+  - name: stores
+    description: Gestão da loja
+  - name: catalog
+    description: Catálogo, produtos e categorias
+  - name: orders
+    description: Pedidos
+  - name: customers
+    description: Clientes
+  - name: reviews
+    description: Avaliações
+  - name: finance
+    description: Financeiro e pagamentos
+  - name: notifications
+    description: Notificações
+  - name: analytics
+    description: Dashboard e análises
+
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Iniciar sessão do vendedor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInInput'
+      responses:
+        '200':
+          description: Sessão iniciada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Terminar sessão
+      responses:
+        '200':
+          description: Sessão terminada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /me:
+    get:
+      tags: [sellers]
+      summary: Identidade e permissões do vendedor autenticado
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/MeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /seller/store:
+    get:
+      tags: [stores]
+      summary: Obter loja associada ao vendedor
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/StoreResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [stores]
+      summary: Criar loja (idem por Idempotency-Key)
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStoreInput'
+      responses:
+        '201':
+          $ref: '#/components/responses/StoreResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    patch:
+      tags: [stores]
+      summary: Atualizar dados da loja
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStoreInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/StoreResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /seller/products:
+    get:
+      tags: [catalog]
+      summary: Listar produtos do vendedor
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/SourceQuery'
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/StatusQuery'
+        - $ref: '#/components/parameters/CategoryQuery'
+      responses:
+        '200':
+          $ref: '#/components/responses/ProductListResponse'
+
+    post:
+      tags: [catalog]
+      summary: Criar produto
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductInput'
+      responses:
+        '201':
+          $ref: '#/components/responses/ProductResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /seller/products/{id}:
+    get:
+      tags: [catalog]
+      summary: Detalhe de produto
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - $ref: '#/components/parameters/SourceQuery'
+      responses:
+        '200':
+          $ref: '#/components/responses/ProductResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [catalog]
+      summary: Atualizar produto
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProductInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/ProductResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    delete:
+      tags: [catalog]
+      summary: Arquivar produto
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Produto arquivado
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /seller/products/{id}/stock:
+    patch:
+      tags: [catalog]
+      summary: Atualizar stock de produto
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                stock:
+                  type: integer
+                  minimum: 0
+              required: [stock]
+      responses:
+        '200':
+          $ref: '#/components/responses/ProductResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /catalog/categories:
+    get:
+      tags: [catalog]
+      summary: Listar categorias
+      parameters:
+        - $ref: '#/components/parameters/KindQuery'
+      responses:
+        '200':
+          description: Lista de categorias
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+
+  /seller/orders:
+    get:
+      tags: [orders]
+      summary: Listar pedidos do vendedor
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/SourceQuery'
+        - $ref: '#/components/parameters/StatusQuery'
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/FromQuery'
+        - $ref: '#/components/parameters/ToQuery'
+      responses:
+        '200':
+          $ref: '#/components/responses/OrderListResponse'
+
+  /seller/orders/{id}:
+    get:
+      tags: [orders]
+      summary: Detalhe de pedido
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - $ref: '#/components/parameters/SourceQuery'
+      responses:
+        '200':
+          $ref: '#/components/responses/OrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /seller/orders/{id}/status:
+    patch:
+      tags: [orders]
+      summary: Alterar estado do pedido
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/OrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /seller/customers:
+    get:
+      tags: [customers]
+      summary: Listar clientes do vendedor
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/SearchQuery'
+      responses:
+        '200':
+          $ref: '#/components/responses/CustomerListResponse'
+
+  /seller/reviews:
+    get:
+      tags: [reviews]
+      summary: Listar avaliações
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Lista de avaliações
+
+  /seller/reviews/{id}:
+    get:
+      tags: [reviews]
+      summary: Detalhe de avaliação
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Detalhe da avaliação
+
+  /seller/finance/summary:
+    get:
+      tags: [finance]
+      summary: Resumo financeiro
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Resumo financeiro
+
+  /seller/finance/transactions:
+    get:
+      tags: [finance]
+      summary: Transações financeiras
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Lista de transações
+
+  /seller/notifications:
+    get:
+      tags: [notifications]
+      summary: Listar notificações
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Lista de notificações
+
+  /seller/notifications/{id}/read:
+    patch:
+      tags: [notifications]
+      summary: Marcar notificação como lida
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Notificação marcada como lida
+
+  /seller/dashboard:
+    get:
+      tags: [analytics]
+      summary: Dados do dashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Dados do dashboard
+
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Serviço operativo
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Cookie de sessão definido pelo servidor
+
+  schemas:
+    SignInInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+
+    MeResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user:
+              type: object
+              properties:
+                id: { type: string }
+                name: { type: string }
+                email: { type: string }
+                phone: { type: string }
+                createdAt: { type: string }
+            roles:
+              type: array
+              items: { type: string }
+            seller:
+              type: object
+              properties:
+                supplierId: { type: string }
+                status: { type: string }
+            stores:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  source: { type: string }
+                  name: { type: string }
+                  status: { type: string }
+            permissions:
+              type: array
+              items: { type: string }
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    StoreResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Store'
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    Store:
+      type: object
+      properties:
+        id: { type: string }
+        sourceId: { type: string }
+        source: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        description: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        whatsapp: { type: string }
+        city: { type: string }
+        province: { type: string }
+        address: { type: string }
+        coverUrl: { type: string }
+        avatarUrl: { type: string }
+        isPublished: { type: boolean }
+        rating: { type: number }
+        followers: { type: number }
+        openingHours:
+          type: array
+          items:
+            type: object
+            properties:
+              day: { type: integer }
+              label: { type: string }
+              opensAt: { type: string }
+              closesAt: { type: string }
+        createdAt: { type: string }
+
+    CreateStoreInput:
+      type: object
+      required: [name, email, phone, city, province]
+      properties:
+        name: { type: string, minLength: 2 }
+        description: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string, minLength: 9 }
+        city: { type: string, minLength: 2 }
+        province: { type: string, minLength: 2 }
+        address: { type: string }
+
+    UpdateStoreInput:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        whatsapp: { type: string }
+        city: { type: string }
+        province: { type: string }
+        address: { type: string }
+
+    ProductResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Product'
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    ProductListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Product' }
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    Product:
+      type: object
+      properties:
+        id: { type: string }
+        source: { type: string }
+        sourceId: { type: string }
+        sku: { type: string }
+        name: { type: string }
+        description: { type: string }
+        category: { type: string }
+        price: { type: number }
+        compareAtPrice: { type: number }
+        stock: { type: integer }
+        lowStockThreshold: { type: integer }
+        status: { type: string }
+        unitsSold: { type: integer }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        imageUrl: { type: string }
+
+    CreateProductInput:
+      type: object
+      required: [name, category, price, stock, status]
+      properties:
+        name: { type: string, minLength: 3 }
+        description: { type: string }
+        category: { type: string }
+        price: { type: number, minimum: 0 }
+        stock: { type: integer, minimum: 0 }
+        status: { type: string, enum: [published, draft, archived] }
+        source: { type: string }
+
+    UpdateProductInput:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        category: { type: string }
+        price: { type: number }
+        stock: { type: integer }
+        status: { type: string }
+
+    OrderStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [pending, confirmed, preparing, ready, shipped, delivered, cancelled]
+
+    OrderResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Order'
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    OrderListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Order' }
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    Order:
+      type: object
+      properties:
+        id: { type: string }
+        reference: { type: string }
+        source: { type: string }
+        customerId: { type: string }
+        customerName: { type: string }
+        customerPhone: { type: string }
+        createdAt: { type: string }
+        status: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              productId: { type: string }
+              name: { type: string }
+              sku: { type: string }
+              quantity: { type: integer }
+              unitPrice: { type: number }
+        subtotal: { type: number }
+        shipping: { type: number }
+        discount: { type: number }
+        total: { type: number }
+        paymentMethod: { type: string }
+        deliveryMethod: { type: string }
+        deliveryCity: { type: string }
+        deliveryAddress: { type: string }
+        note: { type: string }
+        statusHistory:
+          type: array
+          items:
+            type: object
+            properties:
+              status: { type: string }
+              at: { type: string }
+
+    CustomerListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              name: { type: string }
+              email: { type: string }
+              phone: { type: string }
+              city: { type: string }
+              segment: { type: string }
+              ordersCount: { type: integer }
+              totalSpent: { type: number }
+              lastActivityAt: { type: string }
+              customerSince: { type: string }
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    Meta:
+      type: object
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        requestId: { type: string }
+
+  responses:
+    Unauthorized:
+      description: Não autenticado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Sem permissão
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Conflict:
+      description: Conflito de estado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    TooManyRequests:
+      description: Limite de pedidos excedido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ValidationError:
+      description: Validação falhou
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: object }
+            requestId: { type: string }
+
+  parameters:
+    PageQuery:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    LimitQuery:
+      in: query
+      name: limit
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    SourceQuery:
+      in: query
+      name: source
+      schema: { type: string, enum: [sete, venda_express, all] }
+    SearchQuery:
+      in: query
+      name: search
+      schema: { type: string }
+    StatusQuery:
+      in: query
+      name: status
+      schema: { type: string }
+    CategoryQuery:
+      in: query
+      name: category
+      schema: { type: string }
+    KindQuery:
+      in: query
+      name: kind
+      schema: { type: string }
+    IdPath:
+      in: path
+      name: id
+      required: true
+      schema: { type: string }
+    FromQuery:
+      in: query
+      name: from
+      schema: { type: string }
+    ToQuery:
+      in: query
+      name: to
+      schema: { type: string }
