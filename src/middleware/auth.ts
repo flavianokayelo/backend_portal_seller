@@ -7,6 +7,8 @@ import {
 } from "../shared/utils/errors";
 import { vendaExpressAdapter } from "../adapters/venda-express/client";
 import { verifySessionCookie } from "../shared/utils/session";
+// ADICIONADO: diagnóstico do motivo da falha da sessão
+import { diagnoseSessionCookie } from "../shared/utils/session";
 
 const corsOrigin = (
   process.env.CORS_ORIGIN || "http://localhost:3000,http://localhost:3001"
@@ -49,6 +51,14 @@ export function authMiddleware(
   try {
     const payload = verifySessionCookie(sessionCookie);
     if (!payload) {
+      // ADICIONADO: regista o motivo exato (sem segredos) para sabermos porque falhou
+      const diagnosis = diagnoseSessionCookie(sessionCookie);
+      structuredLog({
+        level: "warn",
+        requestId: (req as any).id,
+        message: `Falha na verificação da sessão: ${diagnosis.reason}`,
+        context: diagnosis.details,
+      });
       next(new UnauthorizedError("Sessão inválida ou expirada."));
       return;
     }
