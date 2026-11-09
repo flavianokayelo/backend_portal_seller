@@ -25,6 +25,11 @@ const corsOrigin =
 const allowedOrigins = corsOrigin.split(",").map((o) => o.trim());
 
 app.use(helmet());
+// Trust the first proxy (required for express-rate-limit behind Nginx/LiteSpeed)
+app.set('trust proxy', 1);
+// Ensure cookie-parser is used if your auth uses cookies
+app.use(cookieParser());
+
 app.use(
   cors({
     origin: function (origin, callback) {

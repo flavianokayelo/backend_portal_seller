@@ -97,7 +97,7 @@ router.post(
         secure:
           process.env.NODE_ENV === "production" ||
           process.env.SESSION_COOKIE_SECURE === "true",
-        sameSite: (process.env.SESSION_COOKIE_SAMESITE || "lax") as
+        sameSite: (process.env.SESSION_COOKIE_SAMESITE || "none") as
           "lax" | "strict" | "none",
         domain: process.env.SESSION_COOKIE_DOMAIN || undefined,
         path: "/",
