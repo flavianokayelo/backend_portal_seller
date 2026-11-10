@@ -18,10 +18,11 @@ import notificationRoutes from "./modules/notifications/routes";
 import analyticsRoutes from "./modules/analytics/routes";
 
 const app = express();
-const PORT = Number(process.env.PORT) || 4000;
 
-// IMPORTANTE: Necessário para o express-rate-limit rodar atrás de proxies (Nginx/LiteSpeed)
-app.set('trust proxy', 1);
+// ADICIONADO: o Hostinger põe um proxy à frente do Node. Sem isto o
+// express-rate-limit avisa (X-Forwarded-For) e o IP real não é detectado.
+app.set("trust proxy", 1);
+const PORT = Number(process.env.PORT) || 4000;
 
 const corsOrigin =
   process.env.CORS_ORIGIN || "http://localhost:3000,http://localhost:3001";
@@ -56,16 +57,6 @@ app.use(express.json({ limit: "2mb" }));
 app.use(requestIdMiddleware);
 app.use(loggerMiddleware);
 app.use(generalRateLimiter);
-
-// Rota raiz para evitar erros 404 de pings de otimização/proxy do servidor (LiteSpeed)
-app.get("/", (_req, res) => {
-  res.status(200).json({
-    status: "ok",
-    service: "integration-api",
-    message: "API Root Online",
-    time: new Date().toISOString(),
-  });
-});
 
 // Health check
 app.get("/health", (_req, res) => {

@@ -9,6 +9,9 @@ import {
 import { auditLogger } from "../../shared/utils/audit";
 import { generateRequestId } from "../../shared/utils/errors";
 import { SignInSchema } from "../../shared/schemas/validation";
+// ADICIONADO: criação de conta
+import { SignUpSchema } from "../../shared/schemas/validation";
+import { ConflictError } from "../../shared/utils/errors";
 import { loginRateLimiter } from "../../middleware/rate-limit";
 import { SESSION_TTL_SECONDS, signSessionCookie } from "../../shared/utils/session";
 import {
@@ -97,7 +100,7 @@ router.post(
         secure:
           process.env.NODE_ENV === "production" ||
           process.env.SESSION_COOKIE_SECURE === "true",
-        sameSite: (process.env.SESSION_COOKIE_SAMESITE || "none") as
+        sameSite: (process.env.SESSION_COOKIE_SAMESITE || "lax") as
           "lax" | "strict" | "none",
         domain: process.env.SESSION_COOKIE_DOMAIN || undefined,
         path: "/",
@@ -166,6 +169,76 @@ router.post(
         "VENDA_EXPRESS_UNAVAILABLE",
       );
     }
+  }),
+);
+
+// ADICIONADO: criação de conta. Cria o utilizador no VendaExpress (origem);
+// o portal faz login a seguir com as mesmas credenciais.
+// O caminho upstream pode ser ajustado com VENDA_EXPRESS_REGISTER_PATH.
+router.post(
+  "/register",
+  loginRateLimiter,
+  asyncHandler(async (req, res) => {
+    const requestId = generateRequestId();
+    const parsed = SignUpSchema.safeParse(req.body);
+    if (!parsed.success)
+      throw new ValidationError("Dados inválidos.", parsed.error.flatten());
+
+    const { name, email, password, phone } = parsed.data;
+    const registerPath =
+      process.env.VENDA_EXPRESS_REGISTER_PATH || "/auth/register";
+
+    try {
+      await vendaExpressAdapter.post(registerPath, {
+        name,
+        email,
+        password,
+        ...(phone ? { phone } : {}),
+      });
+    } catch (error) {
+      if (!isVendaExpressError(error)) throw error;
+
+      const upstream = error.upstreamResponse as
+        | { message?: unknown; error?: unknown }
+        | undefined;
+      const upstreamMessage =
+        typeof upstream?.message === "string"
+          ? upstream.message
+          : typeof upstream?.error === "string"
+            ? upstream.error
+            : undefined;
+
+      if (error.upstreamStatus === 409)
+        throw new ConflictError("Já existe uma conta com este email.");
+      if (error.upstreamStatus === 400 || error.upstreamStatus === 422)
+        throw new ValidationError(
+          upstreamMessage || "Não foi possível criar a conta com estes dados.",
+        );
+      if (error.upstreamStatus === 404 || error.upstreamStatus === 405)
+        throw new AppError(
+          "O registo de contas ainda não está disponível no VendaExpress.",
+          501,
+          "REGISTER_NOT_AVAILABLE",
+        );
+      throw new AppError(
+        "O VendaExpress está temporariamente indisponível.",
+        502,
+        "VENDA_EXPRESS_UNAVAILABLE",
+      );
+    }
+
+    auditLogger.log({
+      actorId: email,
+      actorRole: "anonymous",
+      action: "register",
+      resource: "account",
+      resourceId: email,
+      source: "venda_express",
+      outcome: "success",
+      timestamp: new Date().toISOString(),
+    });
+
+    res.status(201).json({ data: { ok: true }, meta: { requestId } });
   }),
 );
 

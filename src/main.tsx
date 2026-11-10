@@ -18,6 +18,10 @@ import notificationRoutes from "./modules/notifications/routes";
 import analyticsRoutes from "./modules/analytics/routes";
 
 const app = express();
+
+// ADICIONADO: o Hostinger põe um proxy à frente do Node. Sem isto o
+// express-rate-limit avisa (X-Forwarded-For) e o IP real não é detectado.
+app.set("trust proxy", 1);
 const PORT = Number(process.env.PORT) || 4000;
 
 const corsOrigin =

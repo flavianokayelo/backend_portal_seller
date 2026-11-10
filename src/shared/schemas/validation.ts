@@ -5,6 +5,26 @@ export const SignInSchema = z.object({
   password: z.string().min(1, "Palavra-passe é obrigatória."),
 });
 
+// ADICIONADO: criação de conta
+export const SignUpSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Nome é obrigatório.")
+    .max(120, "Nome demasiado longo."),
+  email: z.string().trim().email("Email inválido."),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^\+?[0-9 ]{9,18}$/, "Telefone inválido.")
+    .optional()
+    .or(z.literal("")),
+  password: z
+    .string()
+    .min(8, "A palavra-passe deve ter pelo menos 8 caracteres.")
+    .max(128, "Palavra-passe demasiado longa."),
+});
+
 export const CreateStoreSchema = z.object({
   name: z.string().min(2, "Nome da loja é obrigatório."),
   description: z.string().optional(),
